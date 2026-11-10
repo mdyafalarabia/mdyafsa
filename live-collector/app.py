@@ -25,7 +25,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 state = {
     "channel": CHANNEL, "status": "starting", "room_connected": False,
     "events_sent": 0, "events_failed": 0, "gifts_sent": 0, "joins_sent": 0,
-    "questions_sent": 0, "last_attempt_at": None, "last_connect_at": None,
+    "questions_sent": 0, "comments_sent": 0, "last_attempt_at": None, "last_connect_at": None,
     "last_relay_at": None, "last_error": None, "relay_status": "not_tested",
     "last_http_status": None
 }
@@ -96,8 +96,10 @@ async def relay(payload):
             state["gifts_sent"] += 1
         if payload.get("type") == "join":
             state["joins_sent"] += 1
-        if payload.get("type") == "comment" and str(payload.get("comment", "")).startswith("سؤال"):
-            state["questions_sent"] += 1
+        if payload.get("type") == "comment":
+            state["comments_sent"] += 1
+            if str(payload.get("comment", "")).startswith("سؤال"):
+                state["questions_sent"] += 1
         return True
     except Exception as exc:
         state["events_failed"] += 1
@@ -122,7 +124,8 @@ async def run_one():
     @client.on(CommentEvent)
     async def on_comment(event):
         msg = str(getattr(event, "comment", "") or "").strip()[:350]
-        if msg not in {"مشاركة", "1", "2", "3", "4", "١", "٢", "٣", "٤"} and not msg.startswith("سؤال"):
+        # Receive every real public text comment. Categorization and moderation occur downstream.
+        if not msg:
             return
         ident = identity(getattr(event, "user", None))
         if not ident:
